@@ -1,0 +1,303 @@
+# Prompt para Desenvolvimento de Sistema Gerador de Documentos Oficiais
+
+## Visão Geral do Projeto
+
+Desenvolva um sistema web completo para geração de documentos oficiais do setor público (ETPs, Editais, Memorandos, Ofícios, etc.) utilizando ReactJS e integração com LLMs (Large Language Models). O sistema deve ser sofisticado visualmente, mas intuitivo para servidores públicos com diferentes níveis de habilidade técnica.
+
+## Requisitos Funcionais Detalhados
+
+### 1. Landing Page
+
+- **Estrutura Visual:**
+  - Header com logo, nome do sistema e menu de navegação
+  - Banner principal explicando o propósito do sistema com CTA para cadastro/login
+  - Seção destacando os principais tipos de documentos gerados
+  - Seção explicando o uso de IA na geração de documentos
+  - Seção de benefícios (economia de tempo, padronização, etc.)
+  - Seção de depoimentos (opcional)
+  - Footer com informações de contato e links relevantes
+
+- **Conteúdo:**
+  - Texto explicativo sobre cada tipo de documento oferecido
+  - Exemplos visuais dos documentos gerados (mockups)
+  - Breve explicação do processo de uso (3-4 passos com ícones)
+
+- **Interatividade:**
+  - Animações sutis ao scroll
+  - Botões CTA ("Comece Agora", "Saiba Mais", etc.)
+  - Modal ou seção de FAQ
+
+### 2. Sistema de Autenticação
+
+- **Tela de Login:**
+  - Campos para email/usuário e senha
+  - Opção "Esqueci minha senha"
+  - Botão para cadastro de novos usuários
+  - Validação de formulário em tempo real
+
+- **Tela de Cadastro:**
+  - Campos para nome completo, email, senha, confirmação de senha
+  - Opção para cadastro institucional (órgão, departamento)
+  - Validação de segurança de senha
+  - Termos de uso e política de privacidade
+
+- **Recuperação de Senha:**
+  - Fluxo de recuperação por email
+  - Tela para criação de nova senha
+
+### 3. Dashboard Principal
+
+- **Header:**
+  - Logo do sistema
+  - Menu de navegação (Início, Meus Documentos, Configurações, etc.)
+  - Ícone de perfil com dropdown (ver perfil, configurações, sair)
+  - Barra de pesquisa para documentos anteriores
+
+- **Área Principal:**
+  - Saudação personalizada ("Olá, [Nome]")
+  - Cards em grid para cada tipo de documento disponível:
+    - Ícone representativo
+    - Título do tipo de documento
+    - Breve descrição ou propósito
+    - Efeito hover com informação adicional
+    - Botão ou área clicável para iniciar a criação
+
+- **Área Secundária:**
+  - Seção "Documentos Recentes"
+  - Seção "Favoritos" ou "Modelos Salvos"
+  - Dicas rápidas de uso do sistema
+
+- **Rodapé:**
+  - Links para suporte
+  - Versão do sistema
+  - Informações legais
+
+### 4. Fluxo de Geração de Documentos
+
+- **Etapa 1 - Formulário Inicial:**
+  - Título/nome do documento
+  - Seleção do órgão/departamento emissor
+  - Finalidade do documento (campo de texto curto)
+  - Público-alvo/destinatário
+  - Campos específicos conforme o tipo de documento selecionado
+  - Botão para avançar
+
+- **Etapa 2 - Configurações Avançadas (opcional):**
+  - Opções de formatação (cabeçalho, rodapé)
+  - Inclusão de elementos específicos (tabelas, anexos)
+  - Nível de formalidade desejado
+  - Extensão aproximada
+  - Botão para gerar documento
+
+- **Etapa 3 - Visualização e Edição:**
+  - Pré-visualização do documento em formato similar a PDF
+  - Editor de texto rico integrado para modificações
+  - Opções para:
+    - Regenerar o documento com novas instruções
+    - Baixar em PDF
+    - Salvar como modelo
+    - Compartilhar (link ou email)
+    - Imprimir
+
+### 5. Gerenciamento de Documentos
+
+- **Lista de Documentos:**
+  - Tabela com colunas para título, tipo, data de criação, status
+  - Opções de filtro e ordenação
+  - Busca por palavra-chave
+  - Paginação
+
+- **Ações por Documento:**
+  - Visualizar
+  - Editar
+  - Duplicar
+  - Excluir
+  - Compartilhar
+  - Baixar
+
+### 6. Configurações do Usuário
+
+- **Perfil:**
+  - Informações pessoais (nome, email, cargo)
+  - Foto de perfil
+  - Alteração de senha
+  
+- **Preferências:**
+  - Tema claro/escuro
+  - Configurações de notificações
+  - Modelos favoritos
+
+- **Organizacional:**
+  - Departamento/setor
+  - Cargo/função
+  - Informações para assinatura digital
+
+## Requisitos Técnicos
+
+### 1. Front-end (ReactJS)
+
+- **Frameworks e Bibliotecas:**
+  - React 18+
+  - React Router para navegação
+  - Redux ou Context API para gerenciamento de estado
+  - Styled Components ou Tailwind CSS para estilização
+  - Formik e Yup para validação de formulários
+  - React Query para gerenciamento de requisições
+  - PDF.js para visualização de PDFs
+  - Draft.js ou Quill para editor de texto rico
+  - Framer Motion para animações (opcional)
+
+- **Estrutura de Componentes:**
+  - Componentes reutilizáveis para UI (botões, inputs, cards, etc.)
+  - Layout components (Header, Sidebar, Footer)
+  - Componentes específicos para cada tipo de documento
+  - HOCs para autenticação e permissões
+
+- **Responsividade:**
+  - Design mobile-first
+  - Breakpoints para tablets e desktops
+  - Navegação adaptativa (sidebar em desktop, menu hambúrguer em mobile)
+  - Grid adaptativo para os cards de documentos
+
+### 2. Back-end (API Sugerida)
+
+- **Autenticação:**
+  - JWT para tokens de autenticação
+  - Renovação automática de tokens
+  - Proteção de rotas
+
+- **Integração com LLM:**
+  - Endpoints para enviar prompts estruturados para o modelo de IA
+  - Gerenciamento de rate limits e tokens
+  - Caching de respostas similares para otimização
+
+- **Armazenamento:**
+  - Endpoints para salvar, recuperar e gerenciar documentos
+  - Versionamento de documentos (opcional)
+  - Exportação em múltiplos formatos
+
+### 3. Integração com LLM
+
+- **Prompt Engineering:**
+  - Estruturas de prompt específicas para cada tipo de documento
+  - Instruções detalhadas sobre formatação e estilo
+  - Inclusão de exemplos relevantes para o tipo de documento
+  - Parâmetros para controle de temperatura e criatividade
+
+- **Pós-processamento:**
+  - Formatação do texto conforme normas ABNT ou específicas do órgão
+  - Verificação de consistência terminológica
+  - Adição automática de elementos padrão (cabeçalhos, rodapés)
+
+## Especificações de Design
+
+### 1. Estilo Visual
+
+- **Tema de Cores:**
+  - Cores principais que transmitam seriedade e profissionalismo
+  - Paleta secundária para elementos de destaque
+  - Cores de feedback (sucesso, erro, aviso)
+  - Suporte a tema claro e escuro
+
+- **Tipografia:**
+  - Fonte principal para textos (sans-serif, boa legibilidade)
+  - Fonte secundária para títulos (opcional)
+  - Hierarquia clara de tamanhos (h1-h6, body, caption)
+  - Espaçamento e entrelinhas adequados para leitura
+
+- **Iconografia:**
+  - Set consistente de ícones (Material Design, Phosphor, etc.)
+  - Uso de ícones representativos para cada tipo de documento
+  - Tamanhos responsivos
+
+- **Componentes:**
+  - Cards com elevação sutil
+  - Botões com estados hover/active claros
+  - Inputs com feedback visual
+  - Skeletons para estados de loading
+  - Toasts para notificações
+
+### 2. Experiência do Usuário
+
+- **Navegação:**
+  - Breadcrumbs para fluxos complexos
+  - Indicadores de progresso em processos multi-etapa
+  - Menu lateral colapsável
+  - Retorno visual para todas as interações
+
+- **Acessibilidade:**
+  - Contraste adequado
+  - Textos alternativos para imagens
+  - Navegação por teclado
+  - Suporte a leitores de tela
+  - Tamanho de fonte ajustável
+
+- **Microinterações:**
+  - Feedback imediato para ações do usuário
+  - Animações sutis para transições
+  - Estados de loading personalizados
+  - Confirmações para ações destrutivas
+
+## Tipos de Documentos a Implementar
+
+### 1. Ofício
+- Campos específicos: número, assunto, referência, destinatário detalhado
+- Formatação específica com vocativo e fecho formal
+
+### 2. Memorando
+- Campos específicos: número, assunto, destinatário interno, caráter (urgente, reservado)
+- Estilo mais direto e conciso
+
+### 3. Edital
+- Suporte a seções e subseções numeradas
+- Campos para objeto, datas, requisitos, procedimentos
+- Formatação jurídica específica
+
+### 4. ETP (Estudo Técnico Preliminar)
+- Estrutura em tópicos pré-definidos
+- Suporte para tabelas e estimativas
+- Campos para justificativa, soluções, viabilidade
+
+### 5. Ata de Reunião
+- Campos para participantes, pauta, deliberações
+- Formatação de tópicos discutidos
+- Espaço para assinaturas
+
+### 6. Parecer Técnico
+- Campos para objeto da análise, fundamentação, conclusão
+- Suporte a citações e referências
+- Formatação técnica específica
+
+## Estratégia de Implementação Sugerida
+
+### Fase 1: Setup e Landing Page
+- Configuração do projeto React com TypeScript
+- Implementação da landing page responsiva
+- Configuração de rotas e navegação básica
+
+### Fase 2: Autenticação e Dashboard
+- Sistema de login/cadastro completo
+- Implementação do dashboard principal com cards
+- Navegação interna e perfil de usuário
+
+### Fase 3: Geração de Documentos (Core)
+- Formulários dinâmicos para cada tipo de documento
+- Integração com API de LLM
+- Visualização e editor de documentos gerados
+
+### Fase 4: Gerenciamento e Refinamento
+- Sistema de armazenamento e gerenciamento de documentos
+- Funcionalidades avançadas (compartilhamento, modelos)
+- Polimento de UI/UX e testes de usuário
+
+## Considerações de Segurança e Compliance
+
+- Proteção de dados pessoais conforme LGPD
+- Armazenamento seguro de documentos sensíveis
+- Logs de auditoria para ações críticas
+- Níveis de permissão para diferentes tipos de usuários
+- Conformidade com requisitos específicos de documentos públicos
+
+---
+
+Este prompt oferece as diretrizes detalhadas para implementar um sistema completo de geração de documentos oficiais usando ReactJS e integração com LLMs. O desenvolvedor deve adaptar conforme necessidades específicas do projeto, especialmente em relação a requisitos particulares de formatação de documentos públicos da instituição-alvo.

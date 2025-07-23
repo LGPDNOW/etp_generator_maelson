@@ -40,39 +40,7 @@ class EtpLlmGenerator:
             provider (str): O provedor LLM a ser usado ('openai' ou 'anthropic')
         """
         self.provider = provider.lower()
-
-        # Configurar o modelo LLM baseado no provedor
-        if self.provider == "openai":
-            api_key = os.environ.get(
-                "OPENAI_API_KEY", st.secrets.get("OPENAI_API_KEY", ""))
-            if not api_key:
-                st.warning(
-                    "Chave de API da OpenAI não configurada. Defina a variável de ambiente OPENAI_API_KEY ou configure em st.secrets.")
-
-            self.llm = ChatOpenAI(
-                model="gpt-4o-mini",
-                temperature=0.7,
-                api_key=api_key,
-                max_tokens=4000
-            )
-
-        elif self.provider == "anthropic":
-            api_key = os.environ.get(
-                "ANTHROPIC_API_KEY", st.secrets.get("ANTHROPIC_API_KEY", ""))
-            if not api_key:
-                st.warning(
-                    "Chave de API da Anthropic não configurada. Defina a variável de ambiente ANTHROPIC_API_KEY ou configure em st.secrets.")
-
-            self.llm = ChatAnthropic(
-                model="claude-3-opus-20240229",
-                temperature=0.7,
-                api_key=api_key,
-                max_tokens=4000
-            )
-
-        else:
-            raise ValueError(
-                f"Provedor LLM não suportado: {provider}. Use 'openai' ou 'anthropic'.")
+        self.llm = self._get_llm()
 
         # Criar o template de prompt para o ETP
         self.prompt_template = ChatPromptTemplate.from_messages([
@@ -90,16 +58,28 @@ class EtpLlmGenerator:
             | StrOutputParser()
         )
 
+    def _get_llm(self):
+        """Configura e retorna o modelo LLM com base no provedor."""
+        if self.provider == "openai":
+            api_key = os.environ.get("OPENAI_API_KEY", st.secrets.get("OPENAI_API_KEY"))
+            if not api_key:
+                st.warning("Chave de API da OpenAI não configurada.")
+                return None
+            return ChatOpenAI(model="gpt-4o-mini", temperature=0.7, api_key=api_key, max_tokens=4000)
+
+        elif self.provider == "anthropic":
+            api_key = os.environ.get("ANTHROPIC_API_KEY", st.secrets.get("ANTHROPIC_API_KEY"))
+            if not api_key:
+                st.warning("Chave de API da Anthropic não configurada.")
+                return None
+            return ChatAnthropic(model="claude-3-opus-20240229", temperature=0.7, api_key=api_key, max_tokens=4000)
+        
+        else:
+            raise ValueError(f"Provedor LLM não suportado: {self.provider}.")
+
     def _construct_prompt(self, dados_etp: Dict[str, Any]) -> str:
-        """
-        Constrói o prompt para o LLM com base nos dados do ETP.
-
-        Args:
-            dados_etp: Dicionário contendo os dados do ETP
-
-        Returns:
-            str: Prompt formatado para o LLM
-        """
+        """Constrói o prompt para o LLM com base nos dados do ETP."""
+        # ... (código do prompt do ETP permanece o mesmo)
         # Formatar valores monetários
         valor_min = f"R$ {dados_etp['valor_minimo']:,.2f}".replace(",", "X").replace(
             ".", ",").replace("X", ".") if dados_etp['valor_minimo'] else "Não informado"
@@ -152,24 +132,88 @@ class EtpLlmGenerator:
         return prompt
 
     def generate_etp(self, dados_etp: Dict[str, Any]) -> str:
-        """
-        Gera o ETP usando o LLM configurado.
-
-        Args:
-            dados_etp: Dicionário contendo os dados do ETP
-
-        Returns:
-            str: Texto do ETP gerado
-        """
+        """Gera o ETP usando o LLM configurado."""
+        if not self.llm:
+            return "Erro: LLM não inicializado. Verifique as chaves de API."
+        
         prompt = self._construct_prompt(dados_etp)
-
         try:
-            # Executar a cadeia de processamento
             result = self.chain.invoke({"prompt": prompt})
             return result
         except Exception as e:
             st.error(f"Erro ao gerar o ETP: {str(e)}")
             return f"Erro na geração do documento: {str(e)}"
+
+
+class RagChain:
+    """Cadeia de RAG para responder perguntas sobre a Lei 14.133."""
+
+    def __init__(self, retriever, provider: str = "openai"):
+        """
+        Inicializa a cadeia de RAG.
+
+        Args:
+            retriever: O retriever configurado para buscar documentos.
+            provider (str): O provedor LLM a ser usado.
+        """
+        self.retriever = retriever
+        self.provider = provider.lower()
+        self.llm = self._get_llm()
+        self.chain = self._create_rag_chain()
+
+    def _get_llm(self):
+        """Configura e retorna o modelo LLM com base no provedor."""
+        # Reutiliza a lógica da classe EtpLlmGenerator
+        generator = EtpLlmGenerator(provider=self.provider)
+        return generator.llm
+
+    def _create_rag_chain(self):
+        """Cria a cadeia de RAG completa."""
+        if not self.llm:
+            return None
+
+        template = """
+        Você é um assistente especializado na Lei 14.133/2021 (Nova Lei de Licitações e Contratos).
+        Sua tarefa é responder às perguntas dos usuários de forma clara, objetiva e fundamentada,
+        utilizando APENAS o contexto fornecido abaixo.
+
+        Contexto:
+        {context}
+
+        Pergunta:
+        {question}
+
+        Instruções:
+        1. Baseie sua resposta estritamente nas informações do contexto.
+        2. Se o contexto não contiver a resposta, informe que não encontrou informações sobre o assunto no documento.
+        3. Cite o artigo ou seção da lei sempre que possível.
+        4. Seja direto e evite informações desnecessárias.
+        """
+        
+        prompt = ChatPromptTemplate.from_template(template)
+
+        rag_chain = (
+            {"context": self.retriever, "question": RunnablePassthrough()}
+            | prompt
+            | self.llm
+            | StrOutputParser()
+        )
+        return rag_chain
+
+    def invoke(self, question: str) -> str:
+        """
+        Invoca a cadeia de RAG para obter uma resposta.
+
+        Args:
+            question (str): A pergunta do usuário.
+
+        Returns:
+            str: A resposta gerada pela IA.
+        """
+        if not self.chain:
+            return "Erro: A cadeia de RAG não foi inicializada corretamente. Verifique as configurações da API."
+        
+        return self.chain.invoke(question)
 
 
 def format_etp_as_html(etp_text: str) -> str:
