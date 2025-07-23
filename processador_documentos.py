@@ -14,45 +14,53 @@ load_dotenv()
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
 @st.cache_resource
-def criar_indice_vetorial(caminho_pdf: str):
+def criar_indice_vetorial(caminhos_pdf: list[str]):
     """
-    Cria um índice vetorial a partir de um arquivo PDF.
+    Cria um índice vetorial a partir de uma lista de arquivos PDF.
 
-    Esta função carrega um documento PDF, divide o texto em chunks,
-    gera embeddings para cada chunk e os armazena em um índice FAISS.
+    Esta função carrega múltiplos documentos PDF, os combina, divide o texto
+    em chunks, gera embeddings para cada chunk e os armazena em um índice FAISS.
     O resultado é cacheado para evitar reprocessamento.
 
     Args:
-        caminho_pdf (str): O caminho para o arquivo PDF.
+        caminhos_pdf (list[str]): Uma lista de caminhos para os arquivos PDF.
 
     Returns:
         FAISS: O índice vetorial pronto para busca.
     """
-    if not os.path.exists(caminho_pdf):
-        st.error(f"Arquivo PDF não encontrado em: {caminho_pdf}")
+    todos_documentos = []
+    for caminho_pdf in caminhos_pdf:
+        if not os.path.exists(caminho_pdf):
+            st.warning(f"Arquivo PDF não encontrado em: {caminho_pdf}. Pulando.")
+            continue
+        try:
+            loader = PyPDFLoader(caminho_pdf)
+            documentos = loader.load()
+            todos_documentos.extend(documentos)
+        except Exception as e:
+            st.error(f"Erro ao carregar o arquivo {caminho_pdf}: {e}")
+
+    if not todos_documentos:
+        st.error("Nenhum documento PDF pôde ser carregado. Verifique os arquivos.")
         return None
 
     try:
-        # 1. Carregar o documento
-        loader = PyPDFLoader(caminho_pdf)
-        documentos = loader.load()
-
         # 2. Dividir o texto em chunks
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
         )
-        chunks = text_splitter.split_documents(documentos)
+        chunks = text_splitter.split_documents(todos_documentos)
 
         # 3. Gerar embeddings e criar o índice FAISS
         embeddings = OpenAIEmbeddings()
         indice_vetorial = FAISS.from_documents(chunks, embeddings)
 
-        st.success("Índice vetorial da Lei 14.133 criado com sucesso!")
+        st.success("Índice vetorial da base de conhecimento criado com sucesso!")
         return indice_vetorial
 
     except Exception as e:
-        st.error(f"Erro ao processar o PDF e criar o índice: {e}")
+        st.error(f"Erro ao processar os PDFs e criar o índice: {e}")
         return None
 
 def obter_retriever(indice_vetorial):

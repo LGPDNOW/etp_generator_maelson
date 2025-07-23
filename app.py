@@ -210,16 +210,18 @@ with st.sidebar:
 
     if app_mode == "Assistente da Lei 14.133":
         st.header("Documento de Referência")
-        uploaded_file = st.file_uploader(
-            "Carregue a Lei 14.133 em PDF", type="pdf")
-        if uploaded_file:
-            # Salvar o arquivo temporariamente para processamento
-            with open(uploaded_file.name, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            st.session_state.caminho_pdf_lei = uploaded_file.name
+        uploaded_files = st.file_uploader(
+            "Carregue um ou mais arquivos PDF para a base de conhecimento", type="pdf", accept_multiple_files=True)
+        if uploaded_files:
+            # Salvar os arquivos temporariamente para processamento
+            st.session_state.caminhos_pdf_lei = []
+            for uploaded_file in uploaded_files:
+                with open(uploaded_file.name, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                st.session_state.caminhos_pdf_lei.append(uploaded_file.name)
         else:
             # Usar um arquivo padrão se nenhum for enviado
-            st.session_state.caminho_pdf_lei = "ETP_gerado2.pdf"
+            st.session_state.caminhos_pdf_lei = ["ETP_gerado2.pdf"]
 
 # Renderização condicional baseada no modo
 if app_mode == "Gerador de ETP":
@@ -544,11 +546,11 @@ elif app_mode == "Assistente da Lei 14.133":
     st.markdown('<p>Tire suas dúvidas sobre a Nova Lei de Licitações e Contratos.</p>', unsafe_allow_html=True)
 
     # Carregar e processar o PDF
-    if 'caminho_pdf_lei' in st.session_state and st.session_state.caminho_pdf_lei:
-        caminho_pdf = st.session_state.caminho_pdf_lei
+    if 'caminhos_pdf_lei' in st.session_state and st.session_state.caminhos_pdf_lei:
+        caminhos_pdf = st.session_state.caminhos_pdf_lei
         
-        with st.spinner("Analisando o documento da Lei 14.133..."):
-            indice_vetorial = criar_indice_vetorial(caminho_pdf)
+        with st.spinner("Analisando os documentos da base de conhecimento..."):
+            indice_vetorial = criar_indice_vetorial(caminhos_pdf)
 
         if indice_vetorial:
             retriever = obter_retriever(indice_vetorial)
