@@ -189,7 +189,7 @@ with st.sidebar:
         ["Gerador de ETP", "Assistente da Lei 14.133"],
         index=1
     )
-    
+
     st.header("Configurações da IA")
     llm_provider = st.selectbox(
         "Provedor de IA:",
@@ -221,7 +221,8 @@ with st.sidebar:
                 st.session_state.caminhos_pdf_lei.append(uploaded_file.name)
         else:
             # Usar um arquivo padrão se nenhum for enviado
-            st.session_state.caminhos_pdf_lei = ["ETP_gerado2.pdf"]
+            st.session_state.caminhos_pdf_lei = [
+                "data/input/lei_14133.pdf", "data/input/Manual_Compras_Licitacoes.pdf"]
 
 # Renderização condicional baseada no modo
 if app_mode == "Gerador de ETP":
@@ -477,7 +478,8 @@ if app_mode == "Gerador de ETP":
         col1, col2 = st.columns([4, 6])
 
         with col1:
-            st.markdown('<h3>Resumo das Informações</h3>', unsafe_allow_html=True)
+            st.markdown('<h3>Resumo das Informações</h3>',
+                        unsafe_allow_html=True)
             st.markdown('<div class="card">'
                         f'<h4>Problema</h4>'
                         f'<p>{st.session_state.dados_etp["descricao_problema"][:150]}...</p>'
@@ -507,7 +509,7 @@ if app_mode == "Gerador de ETP":
             with col_download:
                 if st.session_state.pdf_bytes:
                     pdf_download_link = create_download_link(
-                        st.session_state.pdf_bytes, "ETP_gerado.pdf")
+                        st.session_state.pdf_bytes, "data/output/ETP_gerado.pdf")
                     st.markdown(pdf_download_link, unsafe_allow_html=True)
                 else:
                     if st.button("Gerar PDF"):
@@ -533,7 +535,8 @@ if app_mode == "Gerador de ETP":
 
         if st.button("Gerar novo ETP"):
             st.session_state.step = 1
-            st.session_state.dados_etp = {k: '' for k in st.session_state.dados_etp}
+            st.session_state.dados_etp = {
+                k: '' for k in st.session_state.dados_etp}
             st.session_state.dados_etp.update({
                 'areas_impactadas': [], 'stakeholders': [], 'valor_minimo': None,
                 'valor_medio': None, 'valor_maximo': None, 'declaracao_viabilidade': 'viável'
@@ -542,19 +545,22 @@ if app_mode == "Gerador de ETP":
             st.session_state.pdf_bytes = None
 
 elif app_mode == "Assistente da Lei 14.133":
-    st.markdown('<h2 class="sub-header">Assistente da Lei 14.133</h2>', unsafe_allow_html=True)
-    st.markdown('<p>Tire suas dúvidas sobre a Nova Lei de Licitações e Contratos.</p>', unsafe_allow_html=True)
+    st.markdown('<h2 class="sub-header">Assistente da Lei 14.133</h2>',
+                unsafe_allow_html=True)
+    st.markdown('<p>Tire suas dúvidas sobre a Nova Lei de Licitações e Contratos.</p>',
+                unsafe_allow_html=True)
 
     # Carregar e processar o PDF
     if 'caminhos_pdf_lei' in st.session_state and st.session_state.caminhos_pdf_lei:
         caminhos_pdf = st.session_state.caminhos_pdf_lei
-        
+
         with st.spinner("Analisando os documentos da base de conhecimento..."):
             indice_vetorial = criar_indice_vetorial(caminhos_pdf)
 
         if indice_vetorial:
             retriever = obter_retriever(indice_vetorial)
-            rag_chain = RagChain(retriever=retriever, provider=llm_provider.lower())
+            rag_chain = RagChain(retriever=retriever,
+                                 provider=llm_provider.lower())
 
             # Inicializar o estado do chat
             if "messages" not in st.session_state:
@@ -568,7 +574,8 @@ elif app_mode == "Assistente da Lei 14.133":
             # Campo de entrada para a pergunta do usuário
             if prompt := st.chat_input("Qual é a sua dúvida?"):
                 # Adicionar a mensagem do usuário ao histórico
-                st.session_state.messages.append({"role": "user", "content": prompt})
+                st.session_state.messages.append(
+                    {"role": "user", "content": prompt})
                 with st.chat_message("user"):
                     st.markdown(prompt)
 
@@ -577,13 +584,16 @@ elif app_mode == "Assistente da Lei 14.133":
                     with st.spinner("Pensando..."):
                         resposta = rag_chain.invoke(prompt)
                         st.markdown(resposta)
-                
+
                 # Adicionar a resposta da IA ao histórico
-                st.session_state.messages.append({"role": "assistant", "content": resposta})
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": resposta})
         else:
-            st.warning("Não foi possível criar o assistente. Verifique o arquivo PDF ou as configurações.")
+            st.warning(
+                "Não foi possível criar o assistente. Verifique o arquivo PDF ou as configurações.")
     else:
-        st.info("Por favor, carregue o arquivo PDF da Lei 14.133 na barra lateral para começar.")
+        st.info(
+            "Por favor, carregue o arquivo PDF da Lei 14.133 na barra lateral para começar.")
 
 # Rodapé
 st.markdown('<footer>'
