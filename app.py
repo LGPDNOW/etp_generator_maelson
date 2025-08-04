@@ -571,6 +571,16 @@ elif app_mode == "Assistente da Lei 14.133":
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
+            # Indicador de contexto e botão para nova conversa
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                if len(st.session_state.messages) > 0:
+                    st.info(f"💬 Conversa em andamento ({len(st.session_state.messages)} mensagens)")
+            with col2:
+                if st.button("🔄 Nova Conversa"):
+                    st.session_state.messages = []
+                    st.rerun()
+
             # Campo de entrada para a pergunta do usuário
             if prompt := st.chat_input("Qual é a sua dúvida?"):
                 # Adicionar a mensagem do usuário ao histórico
@@ -581,8 +591,9 @@ elif app_mode == "Assistente da Lei 14.133":
 
                 # Gerar e exibir a resposta da IA
                 with st.chat_message("assistant"):
-                    with st.spinner("Pensando..."):
-                        resposta = rag_chain.invoke(prompt)
+                    with st.spinner("Analisando contexto e histórico..."):
+                        # Usar o novo método com histórico
+                        resposta = rag_chain.invoke_with_history(prompt, st.session_state.messages[:-1])
                         st.markdown(resposta)
 
                 # Adicionar a resposta da IA ao histórico

@@ -174,20 +174,24 @@ class RagChain:
 
         template = """
         Você é um assistente especialista em licitações e contratos públicos, com profundo conhecimento da Lei 14.133/2021 e de manuais de boas práticas.
-        Sua tarefa é fornecer orientações claras e práticas para os usuários, baseando-se no contexto fornecido.
+        Sua tarefa é fornecer orientações claras e práticas para os usuários, baseando-se no contexto fornecido e mantendo a continuidade da conversa.
 
-        Contexto:
+        Contexto dos Documentos:
         {context}
 
-        Pergunta:
+        Histórico da Conversa:
+        {chat_history}
+
+        Pergunta Atual:
         {question}
 
         Instruções:
-        1.  **Seja um Orientador:** Não se limite a dizer se a informação está ou não no texto. Sintetize os pontos relevantes do contexto para fornecer uma recomendação ou um caminho a seguir.
-        2.  **Fundamente sua Resposta:** Baseie suas orientações estritamente nas informações do contexto. Cite artigos, seções ou páginas dos documentos sempre que possível para dar credibilidade à sua resposta.
-        3.  **Seja Prático:** Traduza a linguagem técnica dos documentos para uma orientação que um servidor público possa aplicar no dia a dia.
-        4.  **Em caso de Ambiguidade:** Se o contexto não for claro ou suficiente para uma resposta definitiva, explique as possíveis interpretações e recomende os próximos passos que o usuário deve tomar para obter clareza (ex: "Consulte o setor jurídico", "Verifique o edital específico").
-        5.  **Estruture a Resposta:** Organize a resposta de forma lógica, talvez usando tópicos ou um passo a passo, para facilitar o entendimento.
+        1.  **Mantenha a Continuidade:** Considere todo o histórico da conversa para fornecer respostas coerentes e contextualizadas.
+        2.  **Seja um Orientador:** Sintetize os pontos relevantes do contexto para fornecer recomendações práticas.
+        3.  **Fundamente sua Resposta:** Baseie suas orientações nas informações do contexto e cite fontes quando possível.
+        4.  **Seja Prático:** Traduza a linguagem técnica para orientações aplicáveis no dia a dia.
+        5.  **Estruture a Resposta:** Organize de forma lógica para facilitar o entendimento.
+        6.  **Referências Contextuais:** Quando apropriado, faça referência a pontos discutidos anteriormente na conversa.
         """
         
         prompt = ChatPromptTemplate.from_template(template)
@@ -200,9 +204,88 @@ class RagChain:
         )
         return rag_chain
 
+    def _format_chat_history(self, chat_history: list) -> str:
+        """
+        Formata o histórico de chat para inclusão no prompt.
+        
+        Args:
+            chat_history (list): Lista de mensagens no formato:
+                               [{"role": "user", "content": "..."},
+                                {"role": "assistant", "content": "..."}]
+            
+        Returns:
+            str: Histórico formatado
+        """
+        if not chat_history:
+            return "Nenhuma conversa anterior."
+        
+        # Pegar apenas as últimas 6 mensagens para não sobrecarregar o prompt
+        recent_history = chat_history[-6:] if len(chat_history) > 6 else chat_history
+        
+        formatted_history = []
+        for message in recent_history:
+            role = "Usuário" if message["role"] == "user" else "Assistente"
+            content = message["content"][:200] + "..." if len(message["content"]) > 200 else message["content"]
+            formatted_history.append(f"{role}: {content}")
+        
+        return "\n".join(formatted_history)
+
+    def invoke_with_history(self, question: str, chat_history: list) -> str:
+        """
+        Invoca a cadeia de RAG com histórico de conversa.
+        
+        Args:
+            question (str): A pergunta atual do usuário
+            chat_history (list): Lista de mensagens anteriores no formato:
+                               [{"role": "user", "content": "..."},
+                                {"role": "assistant", "content": "..."}]
+        
+        Returns:
+            str: A resposta gerada pela IA considerando o contexto
+        """
+        if not self.chain:
+            return "Erro: A cadeia de RAG não foi inicializada corretamente. Verifique as configurações da API."
+        
+        # Formatar o histórico da conversa
+        formatted_history = self._format_chat_history(chat_history)
+        
+        # Criar uma nova cadeia que inclui o histórico
+        template = """
+        Você é um assistente especialista em licitações e contratos públicos, com profundo conhecimento da Lei 14.133/2021 e de manuais de boas práticas.
+        Sua tarefa é fornecer orientações claras e práticas para os usuários, baseando-se no contexto fornecido e mantendo a continuidade da conversa.
+
+        Contexto dos Documentos:
+        {context}
+
+        Histórico da Conversa:
+        {chat_history}
+
+        Pergunta Atual:
+        {question}
+
+        Instruções:
+        1.  **Mantenha a Continuidade:** Considere todo o histórico da conversa para fornecer respostas coerentes e contextualizadas.
+        2.  **Seja um Orientador:** Sintetize os pontos relevantes do contexto para fornecer recomendações práticas.
+        3.  **Fundamente sua Resposta:** Baseie suas orientações nas informações do contexto e cite fontes quando possível.
+        4.  **Seja Prático:** Traduza a linguagem técnica para orientações aplicáveis no dia a dia.
+        5.  **Estruture a Resposta:** Organize de forma lógica para facilitar o entendimento.
+        6.  **Referências Contextuais:** Quando apropriado, faça referência a pontos discutidos anteriormente na conversa.
+        """
+        
+        prompt = ChatPromptTemplate.from_template(template)
+        
+        chain_with_history = (
+            {"context": self.retriever, "chat_history": lambda x: formatted_history, "question": RunnablePassthrough()}
+            | prompt
+            | self.llm
+            | StrOutputParser()
+        )
+        
+        return chain_with_history.invoke(question)
+
     def invoke(self, question: str) -> str:
         """
-        Invoca a cadeia de RAG para obter uma resposta.
+        Invoca a cadeia de RAG para obter uma resposta (sem histórico).
 
         Args:
             question (str): A pergunta do usuário.
