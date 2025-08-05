@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 from integrador import EtpLlmGenerator, AssistenteEtpInteligente, RagChain
 from processador_documentos import criar_indice_vetorial, obter_retriever
@@ -293,16 +294,19 @@ async def perguntar_rag(pergunta_data: PerguntaRAG):
     
     try:
         if pergunta_data.historico:
-            resposta = rag_chain.invoke_with_history(
+            resposta_texto = rag_chain.invoke_with_history(
                 pergunta_data.pergunta,
                 pergunta_data.historico
             )
         else:
-            resposta = rag_chain.invoke(pergunta_data.pergunta)
+            resposta_texto = rag_chain.invoke(pergunta_data.pergunta)
         
+        # Estruturar resposta no formato esperado pelo frontend
         return {
             "status": "success",
-            "resposta": resposta
+            "resposta": resposta_texto,
+            "fontes": [],  # Pode ser implementado futuramente
+            "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro na consulta RAG: {str(e)}")

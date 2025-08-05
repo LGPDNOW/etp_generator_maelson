@@ -139,6 +139,13 @@ export const apiService = {
     });
   },
 
+  async consultarRag(pergunta, historico = []) {
+    return await apiClient.post('/api/perguntar-rag', {
+      pergunta,
+      historico
+    });
+  },
+
   // ===== UTILITÁRIOS =====
 
   /**
