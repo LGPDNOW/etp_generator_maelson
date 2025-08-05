@@ -7,7 +7,7 @@ from io import BytesIO
 import random
 import os
 # from etp_llm_generator import EtpLlmGenerator, format_etp_as_html, save_etp_as_pdf
-from integrador import EtpLlmGenerator, format_etp_as_html, save_etp_as_pdf, RagChain
+from integrador import EtpLlmGenerator, format_etp_as_html, save_etp_as_pdf, RagChain, criar_assistente_etp, criar_botao_ajuda_campo, exibir_feedback_campo, criar_botao_ajuda_campo_trt2, exibir_feedback_campo_trt2, criar_validacao_completa_trt2
 from processador_documentos import criar_indice_vetorial, obter_retriever
 
 # Configuração da página
@@ -125,6 +125,7 @@ if 'step' not in st.session_state:
 
 if 'dados_etp' not in st.session_state:
     st.session_state.dados_etp = {
+        'orgao_responsavel': '',
         'descricao_problema': '',
         'areas_impactadas': [],
         'stakeholders': [],
@@ -151,6 +152,13 @@ if 'documento_gerado' not in st.session_state:
 
 if 'pdf_bytes' not in st.session_state:
     st.session_state.pdf_bytes = None
+
+# Inicializar assistente inteligente ETP
+if 'assistente_etp' not in st.session_state:
+    st.session_state.assistente_etp = None
+
+if 'feedback_campos' not in st.session_state:
+    st.session_state.feedback_campos = {}
 
 # Funções de navegação
 
@@ -208,6 +216,14 @@ with st.sidebar:
         if anthropic_api_key:
             os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
 
+    # Inicializar assistente inteligente se as APIs estão configuradas
+    if (llm_provider == "OpenAI" and os.environ.get("OPENAI_API_KEY")) or \
+       (llm_provider == "Anthropic/Claude" and os.environ.get("ANTHROPIC_API_KEY")):
+        if st.session_state.assistente_etp is None:
+            provider = "openai" if llm_provider == "OpenAI" else "anthropic"
+            st.session_state.assistente_etp = criar_assistente_etp(provider)
+            st.success("🤖 Assistente Inteligente ETP ativado!")
+
     if app_mode == "Assistente da Lei 14.133":
         st.header("Documento de Referência")
         uploaded_files = st.file_uploader(
@@ -262,10 +278,30 @@ if app_mode == "Gerador de ETP":
         st.markdown('<h2 class="sub-header">Etapa 1: Identificação do Problema</h2>',
                     unsafe_allow_html=True)
 
+        orgao = st.text_input("Órgão/Organização responsável:",
+                             value=st.session_state.dados_etp['orgao_responsavel'],
+                             help="Nome completo do órgão ou organização responsável pela contratação")
+
         descricao = st.text_area("Descrição do problema ou necessidade:",
                                  value=st.session_state.dados_etp['descricao_problema'],
                                  height=150,
                                  help="Descreva o problema ou necessidade que motiva esta contratação")
+
+        # Botões de ajuda para descrição da necessidade
+        if st.session_state.assistente_etp:
+            feedback_key = "descricao_necessidade"
+            feedback = criar_botao_ajuda_campo_trt2(
+                st.session_state.assistente_etp,
+                "descricao_necessidade",
+                descricao,
+                st.session_state.dados_etp,
+                feedback_key
+            )
+            if feedback:
+                st.session_state.feedback_campos[feedback_key] = feedback
+            
+            if feedback_key in st.session_state.feedback_campos:
+                exibir_feedback_campo_trt2(st.session_state.feedback_campos[feedback_key])
 
         areas_opcoes = ["TI", "RH", "Financeiro", "Administrativo",
                         "Jurídico", "Operacional", "Comercial", "Marketing", "Outro"]
@@ -285,10 +321,42 @@ if app_mode == "Gerador de ETP":
                                        height=100,
                                        help="Liste os principais requisitos funcionais que a solução deve atender")
 
+        # Botões de ajuda para requisitos funcionais
+        if st.session_state.assistente_etp:
+            feedback_key = "requisitos_funcionais"
+            feedback = criar_botao_ajuda_campo_trt2(
+                st.session_state.assistente_etp,
+                "requisitos_funcionais",
+                requisitos_func,
+                st.session_state.dados_etp,
+                feedback_key
+            )
+            if feedback:
+                st.session_state.feedback_campos[feedback_key] = feedback
+            
+            if feedback_key in st.session_state.feedback_campos:
+                exibir_feedback_campo_trt2(st.session_state.feedback_campos[feedback_key])
+
         requisitos_nao_func = st.text_area("Requisitos não funcionais:",
                                            value=st.session_state.dados_etp['requisitos_nao_funcionais'],
                                            height=100,
                                            help="Liste requisitos não funcionais como desempenho, segurança, conformidade etc.")
+
+        # Botões de ajuda para requisitos não funcionais
+        if st.session_state.assistente_etp:
+            feedback_key = "requisitos_nao_funcionais"
+            feedback = criar_botao_ajuda_campo_trt2(
+                st.session_state.assistente_etp,
+                "requisitos_nao_funcionais",
+                requisitos_nao_func,
+                st.session_state.dados_etp,
+                feedback_key
+            )
+            if feedback:
+                st.session_state.feedback_campos[feedback_key] = feedback
+            
+            if feedback_key in st.session_state.feedback_campos:
+                exibir_feedback_campo_trt2(st.session_state.feedback_campos[feedback_key])
 
         st.markdown('<div class="step-nav"></div>', unsafe_allow_html=True)
         col1, col2 = st.columns([1, 1])
@@ -298,6 +366,7 @@ if app_mode == "Gerador de ETP":
         with col2:
             if st.button("Avançar", key="btn_avancar_2"):
                 dados = {
+                    'orgao_responsavel': orgao,
                     'descricao_problema': descricao,
                     'areas_impactadas': areas,
                     'stakeholders': stakeholders,
@@ -316,6 +385,22 @@ if app_mode == "Gerador de ETP":
                                 value=st.session_state.dados_etp['solucoes_mercado'],
                                 height=150,
                                 help="Descreva as principais soluções disponíveis no mercado para atender esta necessidade")
+
+        # Botões de ajuda para soluções de mercado
+        if st.session_state.assistente_etp:
+            feedback_key = "solucoes_mercado"
+            feedback = criar_botao_ajuda_campo_trt2(
+                st.session_state.assistente_etp,
+                "solucoes_mercado",
+                solucoes,
+                st.session_state.dados_etp,
+                feedback_key
+            )
+            if feedback:
+                st.session_state.feedback_campos[feedback_key] = feedback
+            
+            if feedback_key in st.session_state.feedback_campos:
+                exibir_feedback_campo_trt2(st.session_state.feedback_campos[feedback_key])
 
         comparativo = st.text_area("Comparativo entre as soluções:",
                                    value=st.session_state.dados_etp['comparativo_solucoes'],
@@ -353,10 +438,42 @@ if app_mode == "Gerador de ETP":
                                     height=100,
                                     help="Descreva a solução que você propõe para atender a necessidade identificada")
 
+        # Botões de ajuda para definição do objeto
+        if st.session_state.assistente_etp:
+            feedback_key = "definicao_objeto"
+            feedback = criar_botao_ajuda_campo_trt2(
+                st.session_state.assistente_etp,
+                "definicao_objeto",
+                solucao_prop,
+                st.session_state.dados_etp,
+                feedback_key
+            )
+            if feedback:
+                st.session_state.feedback_campos[feedback_key] = feedback
+            
+            if feedback_key in st.session_state.feedback_campos:
+                exibir_feedback_campo_trt2(st.session_state.feedback_campos[feedback_key])
+
         justificativa = st.text_area("Justificativa da escolha:",
                                      value=st.session_state.dados_etp['justificativa_escolha'],
                                      height=100,
                                      help="Justifique por que a solução proposta é a mais adequada")
+
+        # Botões de ajuda para justificativa da escolha
+        if st.session_state.assistente_etp:
+            feedback_key = "justificativa_escolha"
+            feedback = criar_botao_ajuda_campo_trt2(
+                st.session_state.assistente_etp,
+                "justificativa_escolha",
+                justificativa,
+                st.session_state.dados_etp,
+                feedback_key
+            )
+            if feedback:
+                st.session_state.feedback_campos[feedback_key] = feedback
+            
+            if feedback_key in st.session_state.feedback_campos:
+                exibir_feedback_campo_trt2(st.session_state.feedback_campos[feedback_key])
 
         st.markdown('<div class="step-nav"></div>', unsafe_allow_html=True)
 
@@ -388,20 +505,84 @@ if app_mode == "Gerador de ETP":
                                   height=150,
                                   help="Descreva como será feita a implantação da solução")
 
+        # Botões de ajuda para estratégia de implantação
+        if st.session_state.assistente_etp:
+            feedback_key = "estrategia_implantacao"
+            feedback = criar_botao_ajuda_campo_trt2(
+                st.session_state.assistente_etp,
+                "estrategia_implantacao",
+                estrategia,
+                st.session_state.dados_etp,
+                feedback_key
+            )
+            if feedback:
+                st.session_state.feedback_campos[feedback_key] = feedback
+            
+            if feedback_key in st.session_state.feedback_campos:
+                exibir_feedback_campo_trt2(st.session_state.feedback_campos[feedback_key])
+
         cronograma = st.text_area("Cronograma estimado:",
                                   value=st.session_state.dados_etp['cronograma'],
                                   height=100,
                                   help="Apresente um cronograma estimado para a implantação")
+
+        # Botões de ajuda para cronograma
+        if st.session_state.assistente_etp:
+            feedback_key = "cronograma"
+            feedback = criar_botao_ajuda_campo_trt2(
+                st.session_state.assistente_etp,
+                "cronograma",
+                cronograma,
+                st.session_state.dados_etp,
+                feedback_key
+            )
+            if feedback:
+                st.session_state.feedback_campos[feedback_key] = feedback
+            
+            if feedback_key in st.session_state.feedback_campos:
+                exibir_feedback_campo_trt2(st.session_state.feedback_campos[feedback_key])
 
         recursos = st.text_area("Recursos necessários:",
                                 value=st.session_state.dados_etp['recursos_necessarios'],
                                 height=100,
                                 help="Liste os recursos humanos, materiais e tecnológicos necessários")
 
+        # Botões de ajuda para recursos necessários
+        if st.session_state.assistente_etp:
+            feedback_key = "recursos_necessarios"
+            feedback = criar_botao_ajuda_campo_trt2(
+                st.session_state.assistente_etp,
+                "recursos_necessarios",
+                recursos,
+                st.session_state.dados_etp,
+                feedback_key
+            )
+            if feedback:
+                st.session_state.feedback_campos[feedback_key] = feedback
+            
+            if feedback_key in st.session_state.feedback_campos:
+                exibir_feedback_campo_trt2(st.session_state.feedback_campos[feedback_key])
+
         providencias = st.text_area("Providências necessárias:",
                                     value=st.session_state.dados_etp['providencias'],
                                     height=100,
                                     help="Descreva as providências a serem tomadas antes e durante a implantação")
+
+        # Botões de ajuda para providências necessárias
+        if st.session_state.assistente_etp:
+            feedback_key = "providencias"
+            feedback = criar_botao_ajuda_campo_trt2(
+                st.session_state.assistente_etp,
+                "providencias",
+                providencias,
+                st.session_state.dados_etp,
+                feedback_key
+            )
+            if feedback:
+                st.session_state.feedback_campos[feedback_key] = feedback
+            
+            if feedback_key in st.session_state.feedback_campos:
+                exibir_feedback_campo_trt2(st.session_state.feedback_campos[feedback_key])
 
         st.markdown('<div class="step-nav"></div>', unsafe_allow_html=True)
 
@@ -439,6 +620,40 @@ if app_mode == "Gerador de ETP":
                                options=["viável", "inviável"],
                                index=0 if st.session_state.dados_etp['declaracao_viabilidade'] == "viável" else 1,
                                help="Declare se a contratação é viável ou inviável com base no estudo realizado")
+
+        # Validação geral do ETP antes de finalizar
+        if st.session_state.assistente_etp:
+            # Atualizar dados com valores atuais
+            dados_atuais = st.session_state.dados_etp.copy()
+            dados_atuais.update({
+                'beneficios': beneficios,
+                'beneficiarios': beneficiarios,
+                'declaracao_viabilidade': viabilidade
+            })
+            
+            # Usar função integrada de validação TRT-2
+            criar_validacao_completa_trt2(dados_atuais, st.session_state.assistente_etp)
+            
+            # Validação de consistência geral (mantida como backup)
+            st.markdown("### 🤖 Validação de Consistência")
+            if st.button("🔍 Validar Consistência Geral", help="Analisa a consistência entre todos os campos do ETP"):
+                with st.spinner("Analisando consistência geral do ETP..."):
+                    try:
+                        validacao = st.session_state.assistente_etp.validar_consistencia_geral(dados_atuais)
+                        st.session_state.feedback_campos["validacao_geral"] = {
+                            'tipo': 'validacao_geral',
+                            'conteudo': validacao.get('analise_geral', 'Análise não disponível'),
+                            'qualidade': 'info'
+                        }
+                    except Exception as e:
+                        st.error(f"Erro na validação: {str(e)}")
+            
+            # Exibir resultado da validação geral
+            if "validacao_geral" in st.session_state.feedback_campos:
+                feedback = st.session_state.feedback_campos["validacao_geral"]
+                st.markdown("#### 📋 Resultado da Validação de Consistência")
+                with st.expander("Ver análise completa", expanded=True):
+                    st.markdown(feedback['conteudo'])
 
         st.markdown('<div class="step-nav"></div>', unsafe_allow_html=True)
 
@@ -543,6 +758,7 @@ if app_mode == "Gerador de ETP":
             })
             st.session_state.documento_gerado = None
             st.session_state.pdf_bytes = None
+            st.session_state.feedback_campos = {}  # Limpar feedback do assistente
 
 elif app_mode == "Assistente da Lei 14.133":
     st.markdown('<h2 class="sub-header">Assistente da Lei 14.133</h2>',
