@@ -150,6 +150,9 @@ if 'dados_etp' not in st.session_state:
 if 'documento_gerado' not in st.session_state:
     st.session_state.documento_gerado = None
 
+if 'documento_editado' not in st.session_state:
+    st.session_state.documento_editado = None
+
 if 'pdf_bytes' not in st.session_state:
     st.session_state.pdf_bytes = None
 
@@ -741,9 +744,54 @@ if app_mode == "Gerador de ETP":
         with col2:
             st.markdown('<h3>Documento ETP Gerado pela IA</h3>',
                         unsafe_allow_html=True)
+            
+            # Inicializar documento editado se ainda não existe
+            if st.session_state.documento_gerado and st.session_state.documento_editado is None:
+                st.session_state.documento_editado = st.session_state.documento_gerado
+            
             if st.session_state.documento_gerado:
-                st.markdown(f'<div class="pdf-container">{st.session_state.documento_gerado}</div>',
-                            unsafe_allow_html=True)
+                # Criar abas para visualização e edição
+                tab1, tab2 = st.tabs(["📖 Visualizar", "✏️ Editar"])
+                
+                with tab1:
+                    # Mostrar documento atual (editado ou original)
+                    documento_atual = st.session_state.documento_editado or st.session_state.documento_gerado
+                    st.markdown(f'<div class="pdf-view">{documento_atual}</div>',
+                                unsafe_allow_html=True)
+                
+                with tab2:
+                    st.markdown("**✏️ Edite o documento ETP abaixo:**")
+                    st.info("💡 Você pode modificar qualquer parte do documento. As alterações serão salvas automaticamente.")
+                    
+                    # Campo de texto editável
+                    documento_editado = st.text_area(
+                        "Documento ETP Editável",
+                        value=st.session_state.documento_editado or st.session_state.documento_gerado,
+                        height=600,
+                        key="editor_etp",
+                        label_visibility="collapsed",
+                        help="Edite o documento conforme necessário. Use formatação em markdown se desejar."
+                    )
+                    
+                    # Salvar alterações
+                    col_save, col_reset = st.columns(2)
+                    with col_save:
+                        if st.button("💾 Salvar Alterações", key="salvar_edicoes"):
+                            st.session_state.documento_editado = documento_editado
+                            # Regenerar PDF com documento editado
+                            try:
+                                etp_html = format_etp_as_html(documento_editado)
+                                st.session_state.pdf_bytes = save_etp_as_pdf(etp_html)
+                                st.success("✅ Alterações salvas com sucesso!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao salvar: {str(e)}")
+                    
+                    with col_reset:
+                        if st.button("🔄 Restaurar Original", key="restaurar_original"):
+                            st.session_state.documento_editado = st.session_state.documento_gerado
+                            st.success("✅ Documento restaurado para versão original!")
+                            st.rerun()
             else:
                 st.warning(
                     "Nenhum documento gerado. Retorne às etapas anteriores e tente novamente.")
@@ -757,6 +805,7 @@ if app_mode == "Gerador de ETP":
                 'valor_medio': None, 'valor_maximo': None, 'declaracao_viabilidade': 'viável'
             })
             st.session_state.documento_gerado = None
+            st.session_state.documento_editado = None
             st.session_state.pdf_bytes = None
             st.session_state.feedback_campos = {}  # Limpar feedback do assistente
 
