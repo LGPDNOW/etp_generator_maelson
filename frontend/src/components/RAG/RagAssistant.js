@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Card, 
-  Input, 
-  Button, 
-  Space, 
-  Typography, 
-  List, 
-  Avatar, 
-  Spin, 
+import {
+  Card,
+  Input,
+  Button,
+  Space,
+  Typography,
+  List,
+  Avatar,
+  Spin,
   message,
   Row,
   Col,
@@ -17,20 +17,20 @@ import {
   Empty,
   Tooltip
 } from 'antd';
-import { 
-  SendOutlined, 
-  UserOutlined, 
+import {
+  SendOutlined,
+  UserOutlined,
   RobotOutlined,
   BookOutlined,
   ClockCircleOutlined,
   ClearOutlined,
-  QuestionCircleOutlined,
-  FileTextOutlined
+  QuestionCircleOutlined
 } from '@ant-design/icons';
 import styled from 'styled-components';
+import ReactMarkdown from 'react-markdown';
 import { apiService } from '../../services/apiService';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 // Styled Components
@@ -245,9 +245,9 @@ const RagAssistant = ({ apiStatus }) => {
 
   const renderMessage = (msg) => (
     <MessageBubble key={msg.id} className={msg.type}>
-      <Avatar 
+      <Avatar
         icon={msg.type === 'user' ? <UserOutlined /> : <RobotOutlined />}
-        style={{ 
+        style={{
           backgroundColor: msg.type === 'user' ? '#1890ff' : '#52c41a',
           flexShrink: 0
         }}
@@ -255,7 +255,25 @@ const RagAssistant = ({ apiStatus }) => {
       
       <div className="message-content">
         <div>
-          {msg.content}
+          {msg.type === 'assistant' ? (
+            <ReactMarkdown
+              components={{
+                h1: ({children}) => <h3 style={{color: '#1890ff', marginBottom: '8px'}}>{children}</h3>,
+                h2: ({children}) => <h4 style={{color: '#1890ff', marginBottom: '6px'}}>{children}</h4>,
+                h3: ({children}) => <h5 style={{color: '#1890ff', marginBottom: '4px'}}>{children}</h5>,
+                p: ({children}) => <p style={{marginBottom: '8px', lineHeight: '1.5'}}>{children}</p>,
+                ul: ({children}) => <ul style={{marginLeft: '16px', marginBottom: '8px'}}>{children}</ul>,
+                ol: ({children}) => <ol style={{marginLeft: '16px', marginBottom: '8px'}}>{children}</ol>,
+                li: ({children}) => <li style={{marginBottom: '4px'}}>{children}</li>,
+                strong: ({children}) => <strong style={{color: '#262626'}}>{children}</strong>,
+                em: ({children}) => <em style={{color: '#595959'}}>{children}</em>
+              }}
+            >
+              {msg.content}
+            </ReactMarkdown>
+          ) : (
+            msg.content
+          )}
         </div>
         
         {msg.sources && msg.sources.length > 0 && (

@@ -915,8 +915,8 @@ def criar_botao_ajuda_campo(nome_campo: str, conteudo_atual: str, contexto_anter
                     if "erro" not in resultado:
                         st.success("✅ Texto melhorado!")
                         st.markdown("**Texto Melhorado:**")
-                        st.text_area("", value=resultado["texto_melhorado"],
-                                   key=f"melhorado_{nome_campo}", height=150)
+                        st.text_area("Texto melhorado", value=resultado["texto_melhorado"],
+                                   key=f"melhorado_{nome_campo}", height=150, label_visibility="collapsed")
                         st.markdown("**Melhorias Realizadas:**")
                         st.info(resultado["melhorias_realizadas"])
                     else:
@@ -929,7 +929,7 @@ def criar_botao_ajuda_campo(nome_campo: str, conteudo_atual: str, contexto_anter
             with st.spinner("Gerando exemplo..."):
                 exemplo = assistente.gerar_exemplo_campo(nome_campo, contexto_anterior)
                 st.markdown("**Exemplo de Preenchimento:**")
-                st.text_area("", value=exemplo, key=f"exemplo_texto_{nome_campo}", height=150)
+                st.text_area("Exemplo de preenchimento", value=exemplo, key=f"exemplo_texto_{nome_campo}", height=150, label_visibility="collapsed")
 
 
 def criar_botao_ajuda_campo_trt2(assistente: AssistenteEtpInteligente, nome_campo: str,
@@ -972,8 +972,8 @@ def criar_botao_ajuda_campo_trt2(assistente: AssistenteEtpInteligente, nome_camp
                     if "erro" not in resultado:
                         st.success("✅ Texto melhorado!")
                         st.markdown("**Texto Melhorado:**")
-                        st.text_area("", value=resultado["texto_melhorado"],
-                                   key=f"melhorado_trt2_{feedback_key}", height=150)
+                        st.text_area("Texto melhorado TRT-2", value=resultado["texto_melhorado"],
+                                   key=f"melhorado_trt2_{feedback_key}", height=150, label_visibility="collapsed")
                         st.markdown("**Melhorias Realizadas:**")
                         st.info(resultado["melhorias_realizadas"])
                     else:
@@ -986,7 +986,7 @@ def criar_botao_ajuda_campo_trt2(assistente: AssistenteEtpInteligente, nome_camp
             with st.spinner("Gerando exemplo..."):
                 exemplo = assistente.gerar_exemplo_campo(nome_campo, contexto_anterior)
                 st.markdown("**Exemplo de Preenchimento:**")
-                st.text_area("", value=exemplo, key=f"exemplo_texto_trt2_{feedback_key}", height=150)
+                st.text_area("Exemplo TRT-2", value=exemplo, key=f"exemplo_texto_trt2_{feedback_key}", height=150, label_visibility="collapsed")
     
     return feedback_resultado
 
@@ -1113,15 +1113,15 @@ class EtpLlmGenerator:
             if not api_key:
                 st.warning("Chave de API da OpenAI não configurada.")
                 return None
-            return ChatOpenAI(model="gpt-4o-mini", temperature=0.7, api_key=api_key, max_tokens=4000)
+            return ChatOpenAI(model="gpt-4o-mini", temperature=0.7, api_key=api_key, max_tokens=8000)
 
         elif self.provider == "anthropic":
             api_key = os.environ.get("ANTHROPIC_API_KEY", st.secrets.get("ANTHROPIC_API_KEY"))
             if not api_key:
                 st.warning("Chave de API da Anthropic não configurada.")
                 return None
-            return ChatAnthropic(model="claude-3-opus-20240229", temperature=0.7, api_key=api_key, max_tokens=4000)
-        
+            return ChatAnthropic(model="claude-3-opus-20240229", temperature=0.7, api_key=api_key, max_tokens=8000)
+
         else:
             raise ValueError(f"Provedor LLM não suportado: {self.provider}.")
 
@@ -1313,17 +1313,186 @@ Elabore o ETP completo seguindo rigorosamente esta estrutura e diretrizes.
         return prompt_tecnico
 
     def generate_etp(self, dados_etp: Dict[str, Any]) -> str:
-        """Gera o ETP usando o LLM configurado."""
+        """Gera o ETP usando o LLM configurado com geração modular."""
         if not self.llm:
             return "Erro: LLM não inicializado. Verifique as chaves de API."
         
-        prompt = self._construct_prompt(dados_etp)
         try:
-            result = self.chain.invoke({"prompt": prompt})
+            # Usar geração modular para garantir completude
+            result = self.generate_etp_modular(dados_etp)
             return result
         except Exception as e:
             st.error(f"Erro ao gerar o ETP: {str(e)}")
             return f"Erro na geração do documento: {str(e)}"
+    
+    def generate_etp_modular(self, dados_etp: Dict[str, Any]) -> str:
+        """Gera ETP em etapas para evitar truncamento."""
+        
+        # Dividir as 17 seções em 3 grupos
+        grupos_secoes = [
+            [1, 2, 3, 4, 5, 6],      # Seções 1-6
+            [7, 8, 9, 10, 11, 12],   # Seções 7-12
+            [13, 14, 15, 16, 17]     # Seções 13-17 (inclui cronograma)
+        ]
+        
+        documento_completo = []
+        
+        for i, grupo in enumerate(grupos_secoes):
+            st.info(f"Gerando seções {grupo[0]}-{grupo[-1]}...")
+            prompt_grupo = self._construct_prompt_grupo(dados_etp, grupo)
+            resultado_grupo = self.chain.invoke({"prompt": prompt_grupo})
+            documento_completo.append(resultado_grupo)
+        
+        # Juntar documento completo
+        documento_final = "\n\n".join(documento_completo)
+        
+        # Validar completude
+        validacao = self._validar_completude_etp(documento_final)
+        if not validacao["completo"]:
+            st.warning(f"⚠️ Algumas seções podem estar incompletas: {', '.join(validacao['secoes_ausentes'])}")
+            st.info(f"📊 Completude: {validacao['percentual_completude']:.1f}%")
+        else:
+            st.success("✅ Todas as 17 seções foram geradas com sucesso!")
+        
+        return documento_final
+    
+    def _construct_prompt_grupo(self, dados_etp: Dict[str, Any], secoes: list) -> str:
+        """Constrói prompt para um grupo específico de seções."""
+        
+        # Formatar valores monetários
+        valor_min = f"R$ {dados_etp['valor_minimo']:,.2f}".replace(",", "X").replace(
+            ".", ",").replace("X", ".") if dados_etp['valor_minimo'] else "Não informado"
+        valor_med = f"R$ {dados_etp['valor_medio']:,.2f}".replace(",", "X").replace(
+            ".", ",").replace("X", ".") if dados_etp['valor_medio'] else "Não informado"
+        valor_max = f"R$ {dados_etp['valor_maximo']:,.2f}".replace(",", "X").replace(
+            ".", ",").replace("X", ".") if dados_etp['valor_maximo'] else "Não informado"
+
+        orgao_responsavel = dados_etp.get('orgao_responsavel', 'Órgão Público')
+        
+        # Definir seções por grupo
+        secoes_definicoes = {
+            1: "**1. DESCRIÇÃO DA NECESSIDADE**\n- Contextualização do problema ou oportunidade identificada\n- Análise de conformidade com Decreto 9.507/2018 (execução direta vs. terceirização)\n- Justificativa técnica para a contratação\n- Identificação de terceirização lícita/ilícita quando aplicável",
+            2: "**2. HISTÓRICO DE CONTRATAÇÕES SIMILARES**\n- Levantamento de contratações anteriores relacionadas\n- Lições aprendidas de contratos similares\n- Análise de relatórios de gestão contratuais anteriores\n- Identificação de oportunidades de melhoria",
+            3: "**3. SOLUÇÕES EXISTENTES NO MERCADO**\n- Pesquisa abrangente de alternativas disponíveis\n- Análise comparativa técnica e econômica\n- Consideração de execução direta pelo órgão\n- Vantagens e desvantagens de cada alternativa",
+            4: "**4. LEVANTAMENTO E ANÁLISE DE RISCOS**\n- Elaboração de Mapa de Riscos obrigatório\n- Identificação de riscos de planejamento, seleção e execução\n- Análise de probabilidade e impacto\n- Medidas de mitigação propostas",
+            5: "**5. CRITÉRIOS DE SUSTENTABILIDADE**\n- Conformidade com Guia de Contratações Sustentáveis\n- Identificação de impactos ambientais\n- Medidas mitigadoras específicas\n- Requisitos de eficiência energética e logística reversa",
+            6: "**6. ESTIMATIVA DO VALOR DA CONTRATAÇÃO**\n- Metodologia de pesquisa conforme art. 23 da Lei 14.133/2021\n- Fontes consultadas (Painel de Preços, SICAF, mercado)\n- Custos totais considerados (aquisição + acessórios + ciclo de vida)\n- Memórias de cálculo detalhadas",
+            7: "**7. DEFINIÇÃO DO OBJETO**\n- Descrição técnica precisa e completa\n- Especificações técnicas detalhadas\n- Alinhamento com necessidade identificada\n- Possibilidade de desdobramento em múltiplos Termos de Referência",
+            8: "**8. JUSTIFICATIVA DE ESCOLHA DA SOLUÇÃO**\n- Fundamentação técnica, operacional e financeira\n- Demonstração de vantajosidade para a Administração\n- Comparação com alternativas analisadas\n- Alinhamento com interesse público",
+            9: "**9. PREVISÃO DE CONTRATAÇÕES FUTURAS (PCA)**\n- Inserção no Plano de Contratações Anuais\n- Cronograma de contratações relacionadas\n- Interdependências com outras aquisições\n- Planejamento plurianual quando aplicável",
+            10: "**10. ESTIMATIVA DE QUANTIDADES**\n- Memórias de cálculo fundamentadas\n- Análise de histórico de consumo\n- Consideração de economia de escala\n- Previsões de demanda futura",
+            11: "**11. JUSTIFICATIVAS PARA PARCELAMENTO, AGRUPAMENTO E SUBCONTRATAÇÃO**\n- Análise de viabilidade técnica e econômica\n- Conformidade com Súmula 247 do TCU\n- Justificativa para divisibilidade ou indivisibilidade do objeto\n- Considerações sobre economia de escala",
+            12: "**12. DEPENDÊNCIA DO CONTRATADO**\n- Análise de dependência tecnológica\n- Medidas para evitar aprisionamento tecnológico\n- Estratégias de migração e portabilidade\n- Garantias de continuidade dos serviços",
+            13: "**13. TRANSIÇÃO CONTRATUAL**\n- Planejamento da transição entre contratos\n- Período de sobreposição necessário\n- Transferência de conhecimento e documentação\n- Continuidade dos serviços essenciais",
+            14: "**14. ESTRATÉGIA DE IMPLANTAÇÃO**\n- Metodologia de implementação detalhada\n- Cronograma executivo com marcos principais\n- Recursos humanos e materiais necessários\n- Plano de gestão de mudanças",
+            15: "**15. BENEFÍCIOS ESPERADOS**\n- Benefícios quantitativos e qualitativos\n- Indicadores de desempenho propostos\n- Beneficiários diretos e indiretos\n- Retorno sobre investimento esperado",
+            16: "**16. DECLARAÇÃO DE ADEQUAÇÃO ORÇAMENTÁRIA**\n- Confirmação de disponibilidade orçamentária\n- Fonte de recursos identificada\n- Compatibilidade com planejamento orçamentário\n- Impacto nas metas fiscais",
+            17: "**17. APROVAÇÃO DA AUTORIDADE COMPETENTE**\n- Identificação da autoridade competente\n- Fundamentação da competência decisória\n- Espaço para assinatura e data\n- Referência aos autos do processo administrativo"
+        }
+        
+        # Construir seções para este grupo
+        secoes_grupo = []
+        for secao_num in secoes:
+            secoes_grupo.append(secoes_definicoes[secao_num])
+        
+        secoes_texto = "\n\n".join(secoes_grupo)
+        
+        prompt_grupo = f"""
+Elabore as seções {secoes[0]} a {secoes[-1]} de um Estudo Técnico Preliminar (ETP) em conformidade com a Lei 14.133/2021.
+
+IMPORTANTE: Desenvolva COMPLETAMENTE cada seção solicitada com conteúdo técnico adequado e linguagem jurídico-administrativa formal.
+
+## DADOS FORNECIDOS PELO USUÁRIO:
+
+**ÓRGÃO RESPONSÁVEL:** {orgao_responsavel}
+
+**IDENTIFICAÇÃO DA NECESSIDADE:**
+- Descrição do problema: {dados_etp['descricao_problema']}
+- Áreas organizacionais impactadas: {', '.join(dados_etp['areas_impactadas'])}
+- Partes interessadas (stakeholders): {', '.join(dados_etp['stakeholders'])}
+
+**REQUISITOS TÉCNICOS:**
+- Requisitos funcionais: {dados_etp['requisitos_funcionais']}
+- Requisitos não funcionais: {dados_etp['requisitos_nao_funcionais']}
+
+**ANÁLISE DE MERCADO REALIZADA:**
+- Soluções identificadas no mercado: {dados_etp['solucoes_mercado']}
+- Análise comparativa: {dados_etp['comparativo_solucoes']}
+- Faixa de preços pesquisada: Mínimo {valor_min}, Médio {valor_med}, Máximo {valor_max}
+
+**SOLUÇÃO TÉCNICA PROPOSTA:**
+- Descrição da solução escolhida: {dados_etp['solucao_proposta']}
+- Fundamentação da escolha: {dados_etp['justificativa_escolha']}
+
+**ESTRATÉGIA DE IMPLEMENTAÇÃO:**
+- Metodologia de implantação: {dados_etp['estrategia_implantacao']}
+- Cronograma previsto: {dados_etp['cronograma']}
+- Recursos organizacionais necessários: {dados_etp['recursos_necessarios']}
+- Providências preparatórias: {dados_etp['providencias']}
+
+**ANÁLISE DE BENEFÍCIOS:**
+- Benefícios esperados: {dados_etp['beneficios']}
+- Beneficiários identificados: {dados_etp['beneficiarios']}
+
+**CONCLUSÃO TÉCNICA:**
+- Declaração de viabilidade: A contratação foi avaliada como {dados_etp['declaracao_viabilidade']}
+
+## SEÇÕES A DESENVOLVER:
+
+{secoes_texto}
+
+## DIRETRIZES:
+
+1. **LINGUAGEM TÉCNICA FORMAL**: Utilize terminologia jurídico-administrativa adequada
+2. **FUNDAMENTAÇÃO LEGAL**: Cite base legal pertinente (Lei 14.133/2021, decretos, instruções normativas)
+3. **ESTRUTURAÇÃO PROFISSIONAL**: Numeração sequencial, parágrafos bem estruturados
+4. **COMPLETUDE TÉCNICA**: Cada seção deve ser desenvolvida adequadamente (não apenas tópicos)
+5. **CONFORMIDADE NORMATIVA**: Aderência total ao Manual TRT-2 e legislação vigente
+
+IMPORTANTE: Para a seção 14 (ESTRATÉGIA DE IMPLANTAÇÃO), inclua OBRIGATORIAMENTE o cronograma detalhado baseado nas informações fornecidas pelo usuário.
+
+Desenvolva APENAS as seções solicitadas ({secoes[0]} a {secoes[-1]}) com conteúdo completo e técnico.
+        """
+        
+        return prompt_grupo
+    
+    def _validar_completude_etp(self, documento_gerado: str) -> Dict[str, Any]:
+        """Valida se todas as seções foram geradas."""
+        
+        secoes_obrigatorias = [
+            "1. DESCRIÇÃO DA NECESSIDADE",
+            "2. HISTÓRICO DE CONTRATAÇÕES",
+            "3. SOLUÇÕES EXISTENTES NO MERCADO",
+            "4. LEVANTAMENTO E ANÁLISE DE RISCOS",
+            "5. CRITÉRIOS DE SUSTENTABILIDADE",
+            "6. ESTIMATIVA DO VALOR",
+            "7. DEFINIÇÃO DO OBJETO",
+            "8. JUSTIFICATIVA DE ESCOLHA",
+            "9. PREVISÃO DE CONTRATAÇÕES FUTURAS",
+            "10. ESTIMATIVA DE QUANTIDADES",
+            "11. JUSTIFICATIVAS PARA PARCELAMENTO",
+            "12. DEPENDÊNCIA DO CONTRATADO",
+            "13. TRANSIÇÃO CONTRATUAL",
+            "14. ESTRATÉGIA DE IMPLANTAÇÃO",  # ← Cronograma aqui
+            "15. BENEFÍCIOS ESPERADOS",
+            "16. DECLARAÇÃO DE ADEQUAÇÃO ORÇAMENTÁRIA",
+            "17. APROVAÇÃO DA AUTORIDADE COMPETENTE"
+        ]
+        
+        secoes_ausentes = []
+        for secao in secoes_obrigatorias:
+            # Verificar se a seção está presente (busca flexível)
+            secao_numero = secao.split('.')[0]
+            if not any(f"{secao_numero}." in linha for linha in documento_gerado.split('\n')):
+                secoes_ausentes.append(secao)
+        
+        return {
+            "completo": len(secoes_ausentes) == 0,
+            "secoes_ausentes": secoes_ausentes,
+            "percentual_completude": ((17 - len(secoes_ausentes)) / 17) * 100,
+            "total_secoes": 17,
+            "secoes_encontradas": 17 - len(secoes_ausentes)
+        }
 
 
 class RagChain:
